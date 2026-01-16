@@ -4,7 +4,7 @@ A comprehensive tool designed to help interns learn cloud cost optimization by a
 
 ## What This Tool Does
 
-This cost optimizer helps interns understand how to:
+This cost optimizer helps Companies understand how to:
 - **Analyze AWS costs** for their projects
 - **Identify cost optimization opportunities** 
 - **Find open-source alternatives** to paid AWS services
@@ -165,7 +165,7 @@ python analyze_billing.py
 
 ## Learning Objectives
 
-This tool helps interns learn:
+This tool helps Companies learn:
 
 1. **Cloud Cost Awareness**
    - Understanding AWS pricing models
