@@ -1,8 +1,8 @@
-# 🚀 AWS Cost Optimizer for Interns
+# AWS Cost Optimizer for Interns
 
 A comprehensive tool designed to help interns learn cloud cost optimization by analyzing their projects and providing actionable recommendations for reducing AWS costs through open-source alternatives and optimization strategies.
 
-## 🎯 What This Tool Does
+## What This Tool Does
 
 This cost optimizer helps interns understand how to:
 - **Analyze AWS costs** for their projects
@@ -11,7 +11,7 @@ This cost optimizer helps interns understand how to:
 - **Implement cost-effective solutions** with step-by-step guidance
 - **Learn best practices** for cloud cost management
 
-## 🏗️ System Architecture
+## System Architecture
 
 ```
 Project Description → Profile Generation → Billing Analysis → Cost Optimization
@@ -19,7 +19,7 @@ Project Description → Profile Generation → Billing Analysis → Cost Optimiz
 User Input          Structured Data      Synthetic AWS Data    Recommendations
 ```
 
-## 📁 Project Structure
+## Project Structure
 
 ```
 cost-optimizer/
@@ -35,7 +35,7 @@ cost-optimizer/
 └── README.md                  # This file
 ```
 
-## 🚀 Quick Start
+## Quick Start
 
 ### 1. Installation
 
@@ -57,7 +57,7 @@ The tool uses Hugging Face's LLaMA 3 model for analysis. The API token is alread
 python cost_optimizer.py
 ```
 
-## 📝 How to Use
+## How to Use
 
 ### Step 1: Enter Project Description
 When you run the tool, you'll be prompted to describe your project. Include:
@@ -90,7 +90,7 @@ The tool provides:
 - **Open-source alternatives** to paid services
 - **Optimization strategies** for existing services
 
-## 🎯 Types of Recommendations
+## Types of Recommendations
 
 ### 1. Open Source Alternatives
 - **MongoDB** → Self-hosted MongoDB or Docker containers
@@ -110,40 +110,40 @@ The tool provides:
 - **Connection pooling** for database efficiency
 - **Caching strategies** to reduce API calls
 
-## 📊 Sample Output
+## Sample Output
 
 ```
-📊 COST ANALYSIS RESULTS
+COST ANALYSIS RESULTS
 ==================================================
 Project: Employee Tracking System
 Current Monthly Cost: ₹18,500.00
 Budget: ₹20,000.00
-✅ Under Budget by: ₹1,500.00
+Under Budget by: ₹1,500.00
 
-💰 OPTIMIZATION OPPORTUNITIES
+OPTIMIZATION OPPORTUNITIES
 Total Potential Savings: ₹7,200.00
 Savings Percentage: 38.9%
 Recommendations Available: 6
 
-🎯 TOP 3 RECOMMENDATIONS:
+TOP 3 RECOMMENDATIONS:
 
 1. Switch to Open Source Alternative for MongoDB
-   💰 Savings: ₹4,500.00
-   📋 Type: open_source
-   📝 Consider using Self-hosted MongoDB, Docker MongoDB instead of MongoDB Atlas
+   Savings: ₹4,500.00
+   Type: open_source
+   Consider using Self-hosted MongoDB, Docker MongoDB instead of MongoDB Atlas
 
 2. Optimize EC2 Configuration
-   💰 Savings: ₹2,100.00
-   📋 Type: optimization
-   📝 Implement cost optimization strategies: Right-size instances, Use auto-scaling, Implement proper monitoring
+   Savings: ₹2,100.00
+   Type: optimization
+   Implement cost optimization strategies: Right-size instances, Use auto-scaling, Implement proper monitoring
 
 3. Switch to Open Source Alternative for CloudWatch
-   💰 Savings: ₹600.00
-   📋 Type: open_source
-   📝 Consider using Prometheus + Grafana, ELK Stack instead of CloudWatch
+   Savings: ₹600.00
+   Type: open_source
+   Consider using Prometheus + Grafana, ELK Stack instead of CloudWatch
 ```
 
-## 🔧 Advanced Usage
+## Advanced Usage
 
 ### Export Reports
 The tool can export detailed reports in multiple formats:
@@ -163,7 +163,7 @@ python generate_billing.py
 python analyze_billing.py
 ```
 
-## 🎓 Learning Objectives
+## Learning Objectives
 
 This tool helps interns learn:
 
@@ -187,7 +187,7 @@ This tool helps interns learn:
    - Risk assessment for changes
    - Implementation planning
 
-## 🛠️ Technical Details
+## Technical Details
 
 ### Dependencies
 - **huggingface-hub**: For LLaMA 3 model inference
@@ -204,7 +204,7 @@ This tool helps interns learn:
 - **Intermediate**: JSON for structured data
 - **Output**: JSON reports with detailed recommendations
 
-## 🚨 Important Notes
+## Important Notes
 
 1. **Synthetic Data**: This tool generates synthetic AWS billing data for educational purposes. Real AWS costs may vary.
 
@@ -214,7 +214,7 @@ This tool helps interns learn:
 
 4. **Learning Focus**: This tool is designed for learning. Use it to understand cost optimization concepts and strategies.
 
-## 🤝 Contributing
+## Contributing
 
 This is an educational project for interns. Feel free to:
 - Add new optimization strategies
@@ -222,13 +222,13 @@ This is an educational project for interns. Feel free to:
 - Add support for more AWS services
 - Enhance the user interface
 
-## 📚 Additional Resources
+## Additional Resources
 
 - [AWS Well-Architected Framework](https://aws.amazon.com/architecture/well-architected/)
 - [AWS Cost Optimization Best Practices](https://aws.amazon.com/pricing/cost-optimization/)
 - [Open Source Alternatives to AWS Services](https://github.com/open-guides/og-aws)
 
-## 🆘 Troubleshooting
+## Troubleshooting
 
 ### Common Issues
 
@@ -254,7 +254,7 @@ If you encounter issues:
 
 ---
 
-**Happy Cost Optimizing! 🎉**
+**Happy Cost Optimizing! **
 
 *Remember: The goal is to learn cost optimization strategies, not just to reduce costs. Understanding the trade-offs and making informed decisions is the key to becoming a better cloud architect.*
 
