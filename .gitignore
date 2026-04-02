@@ -31,6 +31,9 @@ pip-wheel-metadata/
 venv/
 env/
 
+# Streamlit (never commit real secrets)
+.streamlit/secrets.toml
+
 # IDE/editor
 .vscode/
 .idea/

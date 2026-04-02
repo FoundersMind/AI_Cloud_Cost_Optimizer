@@ -21,7 +21,8 @@ def chat_completion(
     api_key = (os.getenv("GROQ_API_KEY") or "").strip()
     if not api_key:
         raise RuntimeError(
-            "GROQ_API_KEY is missing. Add it to .env next to the Python scripts."
+            "GROQ_API_KEY is missing. For local dev add it to .env; "
+            "on Streamlit Community Cloud add it under App settings → Secrets."
         )
     try:
         from groq import Groq

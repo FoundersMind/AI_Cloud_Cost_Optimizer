@@ -21,12 +21,30 @@ from industry_playbooks import INDUSTRY_IDS, get_playbook
 
 load_dotenv(data_path(".env"))
 
+
+def _apply_streamlit_secrets_to_environ() -> None:
+    """Streamlit Community Cloud stores secrets in st.secrets; subprocesses only see os.environ."""
+    try:
+        secrets = st.secrets
+    except (FileNotFoundError, RuntimeError, OSError):
+        return
+    for key in ("GROQ_API_KEY", "GROQ_MODEL"):
+        try:
+            val = secrets.get(key)
+        except Exception:
+            continue
+        if val is not None and str(val).strip():
+            os.environ[key] = str(val).strip()
+
+
 st.set_page_config(
     page_title="FinOps Cost Intelligence",
     page_icon="📊",
     layout="wide",
     initial_sidebar_state="expanded",
 )
+# Must run after set_page_config (first Streamlit command); still before sidebar/pipeline.
+_apply_streamlit_secrets_to_environ()
 
 
 def _industry_label(vid: str) -> str:

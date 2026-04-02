@@ -23,17 +23,42 @@ User Input          Structured Data      Synthetic AWS Data    Recommendations
 
 ```
 cost-optimizer/
-├── cost_optimizer.py          # Main interface and menu system
+├── streamlit_app.py           # Main app (dashboard) — use for Streamlit Cloud
+├── cost_optimizer.py          # Legacy CLI menu
 ├── generate_profile.py        # Extracts structured data from project description
 ├── generate_billing.py        # Generates synthetic AWS billing data
 ├── analyze_billing.py         # Analyzes costs and generates recommendations
-├── project_description.txt    # User's project description
-├── project_profile.json       # Structured project data
-├── mock_billing.json          # Generated AWS billing data
-├── cost_optimization_report.json # Final analysis report
+├── groq_llm.py                # Groq API chat completions
+├── industry_playbooks.py      # Industry-specific FinOps context
+├── project_description.txt    # User's project description (generated, gitignored)
+├── project_profile.json       # Structured project data (gitignored)
+├── mock_billing.json          # Generated AWS billing data (gitignored)
+├── cost_optimization_report.json # Final analysis report (gitignored)
 ├── requirements.txt           # Python dependencies
 └── README.md                  # This file
 ```
+
+## Deploy on Streamlit Community Cloud
+
+1. Push this repo to GitHub.
+2. Open [Streamlit Community Cloud](https://share.streamlit.io/) and sign in with GitHub.
+3. **Create app** → select the repository and branch **main**.
+4. **Main file path:** `streamlit_app.py`
+5. **App settings (⋮) → Secrets** — add your Groq key (see [.streamlit/secrets.toml.example](.streamlit/secrets.toml.example)):
+
+   ```toml
+   GROQ_API_KEY = "gsk_..."
+   ```
+
+   Optional:
+
+   ```toml
+   GROQ_MODEL = "llama-3.3-70b-versatile"
+   ```
+
+6. Deploy. Secrets are copied into `os.environ` on startup so subprocess steps can call the Groq API.
+
+**Note:** Cloud storage is ephemeral; download JSON reports from the app if you need to keep them.
 
 ## Quick Start
 
@@ -49,9 +74,22 @@ pip install -r requirements.txt
 
 ### 2. Setup
 
-The tool uses Hugging Face's LLaMA 3 model for analysis. The API token is already configured, but you can update it in the Python files if needed.
+Create a `.env` file in the project folder (or use Streamlit secrets locally — see [.streamlit/secrets.toml.example](.streamlit/secrets.toml.example)):
 
-### 3. Run the Tool
+```env
+GROQ_API_KEY=your_groq_key
+# optional: GROQ_MODEL=llama-3.3-70b-versatile
+```
+
+Get a key from the [Groq console](https://console.groq.com/keys).
+
+### 3. Run the app (dashboard)
+
+```bash
+streamlit run streamlit_app.py
+```
+
+### 4. Run the legacy CLI
 
 ```bash
 python cost_optimizer.py
@@ -190,14 +228,15 @@ This tool helps Companies learn:
 ## Technical Details
 
 ### Dependencies
-- **huggingface-hub**: For LLaMA 3 model inference
-- **python-dotenv**: Environment variable management
-- **pandas**: Data manipulation (optional)
-- **rich**: Enhanced CLI experience (optional)
+- **groq**: Groq Cloud API for LLM chat (Llama / Mixtral-class models)
+- **streamlit**, **plotly**: Dashboard (`streamlit_app.py`)
+- **python-dotenv**: Local `.env` loading (optional on Streamlit Cloud if you use Secrets)
+- **pandas**: Data manipulation
+- **rich**, **click**: Enhanced CLI (optional)
 
 ### Model Used
-- **Meta-Llama-3-8B-Instruct**: For generating synthetic billing data and recommendations
-- **API**: Hugging Face Inference API (free tier available)
+- Default **GROQ_MODEL** is `llama-3.3-70b-versatile` (override in `.env` or Streamlit Secrets)
+- **API**: [Groq](https://console.groq.com/) (API key required)
 
 ### File Formats
 - **Input**: Plain text project description
@@ -236,9 +275,10 @@ This is an educational project for interns. Feel free to:
    - Ensure all Python files are in the same directory
    - Check file permissions
 
-2. **"Error generating recommendations"**
-   - Check internet connection (needed for Hugging Face API)
-   - Verify the API token is valid
+2. **"Error generating recommendations"** / **GROQ_API_KEY is missing**
+   - Check internet connection (calls Groq’s API)
+   - Local: set `GROQ_API_KEY` in `.env`
+   - Streamlit Cloud: **App settings → Secrets** with `GROQ_API_KEY`
 
 3. **"Could not load project data"**
    - Run the complete analysis pipeline first
