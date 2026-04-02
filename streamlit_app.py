@@ -309,7 +309,7 @@ def _risk_badge_css(risk: str) -> str:
 
 st.set_page_config(
     page_title="FinOps Cost Intelligence",
-    page_icon="◈",
+    page_icon="📊",
     layout="wide",
     initial_sidebar_state="expanded",
 )
@@ -393,9 +393,9 @@ with st.sidebar:
 
     st.markdown("---")
     if not os.getenv("GROQ_API_KEY"):
-        st.warning("Add **GROQ_API_KEY** in `.env` or Streamlit **Secrets**.", icon="⚑")
+        st.warning("Add **GROQ_API_KEY** in `.env` or Streamlit **Secrets**.", icon="⚠️")
     else:
-        st.success(f"Model ready: `{default_model()}`", icon="✓")
+        st.success(f"Model ready: `{default_model()}`", icon="✅")
 
 _section_title("01 · Input", "Workload narrative")
 _path_desc = data_path("project_description.txt")
@@ -423,7 +423,7 @@ if save_ctx:
     with open(_path_desc, "w", encoding="utf-8") as f:
         f.write(desc)
     _save_industry(vertical)
-    st.toast("Context saved.", icon="✓")
+    st.toast("Context saved.", icon="✅")
 
 if run_btn:
     with open(_path_desc, "w", encoding="utf-8") as f:
@@ -439,7 +439,7 @@ if run_btn:
         else:
             status.update(label="Pipeline failed", state="error", expanded=True)
     if ok:
-        st.toast("Analysis complete.", icon="✓")
+        st.toast("Analysis complete.", icon="✅")
     else:
         st.error("One or more steps failed. Review the log below.")
     with st.expander("Technical log", expanded=not ok):
