@@ -2,6 +2,8 @@
 import json
 import os
 
+from app_paths import data_path, ROOT
+
 def run_demo():
     """Run a quick demo of the cost optimizer system"""
     print("🚀 AWS COST OPTIMIZER - DEMO")
@@ -20,7 +22,7 @@ def run_demo():
     print("📁 Checking system files...")
     missing_files = []
     for file in required_files:
-        if os.path.exists(file):
+        if os.path.exists(os.path.join(ROOT, file)):
             print(f"✅ {file}")
         else:
             print(f"❌ {file}")
@@ -40,7 +42,7 @@ consistency and real-time monitoring."""
     print(sample_description)
     
     # Save sample description
-    with open("project_description.txt", "w", encoding="utf-8") as f:
+    with open(data_path("project_description.txt"), "w", encoding="utf-8") as f:
         f.write(sample_description)
     print("\n✅ Sample project description saved!")
     

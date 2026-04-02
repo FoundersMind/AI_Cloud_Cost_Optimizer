@@ -4,14 +4,19 @@ import os
 import re
 import random
 from datetime import datetime, timedelta
-from huggingface_hub import InferenceClient
 from dotenv import load_dotenv
 
-# Load .env file
-load_dotenv()
-HF_TOKEN = os.getenv("HF_TOKEN")
-MODEL_ID = "meta-llama/Meta-Llama-3-8B-Instruct"
 import sys
+
+from app_paths import data_path
+from console_encoding import ensure_utf8_stdio
+
+ensure_utf8_stdio()
+from groq_llm import chat_completion
+from industry_playbooks import load_selected_industry_id, playbook_prompt_block
+
+# Load .env file
+load_dotenv(data_path(".env"))
 
 def clean_json_response(text):
     """Clean and extract JSON from LLM response"""
@@ -42,11 +47,12 @@ def clean_json_response(text):
     return text.strip()
 
 try:
-    client = InferenceClient(MODEL_ID, token=HF_TOKEN)
-    
-    with open("project_profile.json", "r", encoding="utf-8") as f:
+    with open(data_path("project_profile.json"), "r", encoding="utf-8") as f:
         profile = json.load(f)
-    
+
+    industry_id = load_selected_industry_id()
+    industry_block = playbook_prompt_block(industry_id)
+
     print("Generating synthetic cloud billing data...")
     
     # LLM-only generation
@@ -63,6 +69,9 @@ Generate comprehensive, realistic cloud billing data for this project:
 
 PROJECT PROFILE:
 {json.dumps(profile, indent=2)}
+
+INDUSTRY_CONTEXT (bias cost drivers & service mix toward this vertical):
+{industry_block}
 
 REQUIREMENTS:
 - Generate 12-20 realistic billing records
@@ -94,6 +103,7 @@ REALISTIC SCENARIOS TO INCLUDE:
 - Load balancers and CDN
 - DNS, email, and notification services
 - Development and staging environments
+- Where the vertical implies it (e.g., retail: CDN/edge-heavy; fintech: egress + KMS; healthcare: storage + audit logs), overweight those line items modestly but keep totals plausible vs budget.
 
 TOTAL BUDGET: ₹{profile.get('budget_inr_per_month', 20000):,}
 
@@ -102,16 +112,8 @@ OUTPUT: Only valid JSON array, no explanations or markdown.
             }
         ]
         
-        resp = client.chat_completion(messages=messages, max_tokens=2000)
-        
-        # Handle different response formats
-        if hasattr(resp, 'choices') and resp.choices:
-            raw_output = resp.choices[0].message["content"]
-        elif hasattr(resp, 'generated_text'):
-            raw_output = resp.generated_text
-        else:
-            raw_output = str(resp)
-        
+        raw_output = chat_completion(messages, max_tokens=2000, temperature=0.25)
+
         print(f"Raw LLM response (preview): {raw_output[:300]}...")
         
         # Clean the response
@@ -152,7 +154,7 @@ OUTPUT: Only valid JSON array, no explanations or markdown.
             record['cost_inr'] = random.randint(500, 5000)
     
     # Save billing data
-    with open("mock_billing.json", "w", encoding="utf-8") as f:
+    with open(data_path("mock_billing.json"), "w", encoding="utf-8") as f:
         json.dump(billing, f, indent=2, ensure_ascii=False)
     
     print("Billing data saved to mock_billing.json")

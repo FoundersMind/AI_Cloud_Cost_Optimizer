@@ -3,11 +3,16 @@ import subprocess
 import sys
 import os
 
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from app_paths import data_path
+
 def install_requirements():
     """Install required packages"""
     print("📦 Installing required packages...")
     try:
-        subprocess.check_call([sys.executable, "-m", "pip", "install", "-r", "requirements.txt"])
+        subprocess.check_call(
+            [sys.executable, "-m", "pip", "install", "-r", data_path("requirements.txt")]
+        )
         print("✅ All packages installed successfully!")
         return True
     except subprocess.CalledProcessError as e:
@@ -31,27 +36,27 @@ def create_sample_files():
     print("📝 Creating sample files...")
     
     # Create sample project description if it doesn't exist
-    if not os.path.exists("project_description.txt"):
+    if not os.path.exists(data_path("project_description.txt")):
         sample_desc = """We are building a real-time employee tracking system. 
 Backend is FastAPI in Python, database is PostgreSQL on AWS RDS, 
 logs in MongoDB, monitoring via CloudWatch, storage in S3. 
 Monthly budget is 20,000 INR, system must guarantee transactional 
 consistency and real-time monitoring."""
         
-        with open("project_description.txt", "w", encoding="utf-8") as f:
+        with open(data_path("project_description.txt"), "w", encoding="utf-8") as f:
             f.write(sample_desc)
         print("✅ Created sample project_description.txt")
     
     # Create .env file template if it doesn't exist
-    if not os.path.exists(".env"):
-        env_template = """# AWS Cost Optimizer Environment Variables
-# Hugging Face API Token (already configured in the code)
-# HF_TOKEN=your_token_here
+    if not os.path.exists(data_path(".env")):
+        env_template = """# AI Cloud Cost Optimizer — environment variables
+# Groq API key: https://console.groq.com/keys
+GROQ_API_KEY=
 
-# Optional: Custom model ID
-# MODEL_ID=meta-llama/Meta-Llama-3-8B-Instruct
+# Optional: Groq model id (default: llama-3.3-70b-versatile)
+# GROQ_MODEL=llama-3.1-8b-instant
 """
-        with open(".env", "w", encoding="utf-8") as f:
+        with open(data_path(".env"), "w", encoding="utf-8") as f:
             f.write(env_template)
         print("✅ Created .env template file")
 

@@ -1,15 +1,17 @@
 # generate_profile.py (fixed for LLaMA 3 with error handling)
 import json
-import os
 import re
-from huggingface_hub import InferenceClient
 from dotenv import load_dotenv
 
-load_dotenv()
-HF_TOKEN = os.getenv("HF_TOKEN")
-MODEL_ID = "meta-llama/Meta-Llama-3-8B-Instruct"
-
 import sys
+
+from app_paths import data_path
+from console_encoding import ensure_utf8_stdio
+
+ensure_utf8_stdio()
+
+from groq_llm import chat_completion
+load_dotenv(data_path(".env"))
 
 def clean_json_response(text):
     """Clean and extract JSON from LLM response"""
@@ -30,9 +32,7 @@ def clean_json_response(text):
     return text.strip()
 
 try:
-    client = InferenceClient(MODEL_ID, token=HF_TOKEN)
-    
-    with open("project_description.txt", "r", encoding="utf-8") as f:
+    with open(data_path("project_description.txt"), "r", encoding="utf-8") as f:
         desc_text = f.read().strip()
     
     print("Generating project profile...")
@@ -66,16 +66,8 @@ Rules:
             }
         ]
     
-    resp = client.chat_completion(messages=messages, max_tokens=600)
-    
-    # Handle different response formats
-    if hasattr(resp, 'choices') and resp.choices:
-        raw_output = resp.choices[0].message["content"]
-    elif hasattr(resp, 'generated_text'):
-        raw_output = resp.generated_text
-    else:
-        raw_output = str(resp)
-    
+    raw_output = chat_completion(messages, max_tokens=600, temperature=0.2)
+
     print(f"Raw LLM response (preview): {raw_output[:200]}...")
     
     # Clean the response
@@ -102,7 +94,7 @@ Rules:
             sys.exit(1)
     
     # Save profile
-    with open("project_profile.json", "w", encoding="utf-8") as f:
+    with open(data_path("project_profile.json"), "w", encoding="utf-8") as f:
         json.dump(profile, f, indent=2, ensure_ascii=False)
     
     print("Project profile saved to project_profile.json")

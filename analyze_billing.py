@@ -1,28 +1,49 @@
 # analyze_billing.py - Cost Analysis and Optimization Engine
 import json
 import os
-from typing import Dict, List, Any
-from huggingface_hub import InferenceClient
+from typing import Dict, List, Any, Optional
 from dotenv import load_dotenv
 
+from app_paths import data_path
+from console_encoding import ensure_utf8_stdio
+from groq_llm import chat_completion
+from industry_playbooks import (
+    get_playbook,
+    load_selected_industry_id,
+    playbook_prompt_block,
+)
+
+ensure_utf8_stdio()
+
 # Load environment variables
-load_dotenv()
+load_dotenv(data_path(".env"))
+
+_RECOMMENDATION_TYPES = frozenset(
+    {
+        "open_source",
+        "free_tier",
+        "alternative_provider",
+        "optimization",
+        "architecture_change",
+        "right_sizing",
+        "commitment_discount",
+        "workload_placement",
+        "observability_efficiency",
+        "governance_tagging",
+    }
+)
+
 
 class CostAnalyzer:
-    def __init__(self):
-        self.HF_TOKEN = os.getenv("HF_TOKEN")
-        self.MODEL_ID = "meta-llama/Meta-Llama-3-8B-Instruct"
-        self.client = InferenceClient(self.MODEL_ID, token=self.HF_TOKEN)
-
-    def load_project_data(self) -> Dict[str, Any]:
+    def load_project_data(self) -> Optional[Dict[str, Any]]:
         """Load project profile and billing data"""
         try:
-            with open("project_profile.json", "r", encoding="utf-8") as f:
+            with open(data_path("project_profile.json"), "r", encoding="utf-8") as f:
                 profile = json.load(f)
-            
-            with open("mock_billing.json", "r", encoding="utf-8") as f:
+
+            with open(data_path("mock_billing.json"), "r", encoding="utf-8") as f:
                 billing = json.load(f)
-                
+
             return {"profile": profile, "billing": billing}
         except FileNotFoundError as e:
             print(f"Error loading data: {e}")
@@ -62,82 +83,124 @@ class CostAnalyzer:
             "is_over_budget": budget_variance > 0
         }
 
+    def _normalize_recommendation(self, rec: Any, analysis: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+        if not isinstance(rec, dict):
+            return None
+        title = rec.get("title") or rec.get("name") or "Optimization initiative"
+        svc = rec.get("service") or "Multiple services"
+        try:
+            current_cost = float(rec.get("current_cost", 0) or 0)
+        except (TypeError, ValueError):
+            current_cost = 0.0
+        try:
+            potential_savings = float(rec.get("potential_savings", 0) or 0)
+        except (TypeError, ValueError):
+            potential_savings = 0.0
+        rtype = rec.get("recommendation_type") or "optimization"
+        if rtype not in _RECOMMENDATION_TYPES:
+            rtype = "optimization"
+        desc = rec.get("description") or rec.get("summary") or ""
+        effort = rec.get("implementation_effort") or "medium"
+        if effort not in ("low", "medium", "high"):
+            effort = "medium"
+        risk = rec.get("risk_level") or "medium"
+        if risk not in ("low", "medium", "high"):
+            risk = "medium"
+        steps = rec.get("steps")
+        if not isinstance(steps, list):
+            steps = []
+        steps = [str(s) for s in steps if s][:8]
+        providers = rec.get("cloud_providers")
+        if not isinstance(providers, list):
+            providers = []
+        providers = [str(p) for p in providers if p][:6]
+        strategic_theme = rec.get("strategic_theme") or "workload_efficiency"
+        finops_practice = rec.get("finops_practice") or "optimize_usage"
+        business_kpi_hint = rec.get("business_kpi_hint") or ""
+
+        return {
+            "title": str(title)[:200],
+            "service": str(svc)[:120],
+            "current_cost": round(current_cost, 2),
+            "potential_savings": round(max(potential_savings, 0), 2),
+            "recommendation_type": rtype,
+            "description": str(desc)[:4000],
+            "implementation_effort": effort,
+            "risk_level": risk,
+            "steps": steps,
+            "cloud_providers": providers or ["AWS"],
+            "strategic_theme": str(strategic_theme)[:120],
+            "finops_practice": str(finops_practice)[:120],
+            "business_kpi_hint": str(business_kpi_hint)[:240],
+        }
+
     def generate_optimization_recommendations(self, analysis: Dict[str, Any], data: Dict[str, Any]) -> List[Dict[str, Any]]:
         """Generate specific cost optimization recommendations using LLM"""
         profile = data["profile"]
         billing = data["billing"]
-        
+        industry_id = load_selected_industry_id()
+        industry_block = playbook_prompt_block(industry_id)
+
         # LLM-only recommendations
         try:
             messages = [
                 {
                     "role": "system",
-                    "content": """You are an expert cloud cost optimization consultant with deep knowledge of all major cloud providers (AWS, Azure, GCP, Oracle Cloud, DigitalOcean, etc.) and open-source alternatives. You provide intelligent, data-driven recommendations for reducing cloud costs while maintaining performance and reliability. You consider all cloud providers, free tiers, open-source solutions, and cost optimization strategies."""
+                    "content": (
+                        "You are a principal FinOps + cloud economics advisor for Global 2000 enterprises. "
+                        "You align technical cost moves with measurable business KPIs, guardrails (latency, "
+                        "availability, compliance), and pragmatic execution (backlog, owners, proof metrics). "
+                        "You know AWS/Azure/GCP economics: commitments (Savings Plans, CUD, RIs), spot/spot-like "
+                        "for fault-tolerant work, rightsizing, autoscaling, storage lifecycle & tiering, "
+                        "data egress controls, observability cardinality, tagging & chargeback, sandbox controls, "
+                        "and architectural choices (managed vs self-run). Prefer actionable initiatives over generic advice."
+                    ),
                 },
                 {
                     "role": "user",
                     "content": f"""
-Analyze this project's cloud costs and provide intelligent optimization recommendations:
+Analyze this organization's cloud spend and produce an ENTERPRISE-GRADE savings backlog.
+
+INDUSTRY_CONTEXT:
+{industry_block}
 
 PROJECT PROFILE:
 {json.dumps(profile, indent=2)}
 
-CURRENT BILLING ANALYSIS:
+QUANTITATIVE ANALYSIS:
 {json.dumps(analysis, indent=2)}
 
-BILLING DETAILS:
+BILLING LINE ITEMS:
 {json.dumps(billing, indent=2)}
 
-TASK: Provide 6-10 intelligent cost optimization recommendations in JSON format.
+TASK: Return 8-12 recommendations as a JSON array. Each item must be a JSON object with EXACT keys:
+- title (string)
+- service (string)
+- current_cost (number, INR/month, grounded in billing where possible; estimate only if needed)
+- potential_savings (number INR/month; conservative but meaningful)
+- recommendation_type (one of: open_source, free_tier, alternative_provider, optimization, architecture_change, right_sizing, commitment_discount, workload_placement, observability_efficiency, governance_tagging)
+- strategic_theme (short string: e.g. "commitments_and_discounts", "workload_efficiency", "data_platform", "observability_tax", "egress_and_network", "governance_chargeback")
+- finops_practice (short string mapped to FinOps capabilities language: understand_usage, optimize_usage, quantify_business_value, manage_variability, manage_commitments, etc.)
+- business_kpi_hint (string: which business KPI this improves — unit cost, margin, latency risk, auditability, time-to-market)
+- description (string: why this saves money, trade-offs, and how to validate with metrics)
+- implementation_effort ("low"|"medium"|"high")
+- risk_level ("low"|"medium"|"high")
+- steps (array of 3-6 concrete steps; include a measurement/validation step)
+- cloud_providers (array of strings)
 
-REQUIREMENTS for each recommendation:
-- title: Clear, actionable title
-- service: Which cloud service/provider this applies to
-- current_cost: Current monthly cost in INR (from billing data)
-- potential_savings: Realistic estimated monthly savings in INR
-- recommendation_type: "open_source", "free_tier", "alternative_provider", "optimization", "architecture_change", or "right_sizing"
-- description: Detailed explanation with reasoning
-- implementation_effort: "low", "medium", or "high"
-- risk_level: "low", "medium", or "high"
-- steps: Array of 3-5 specific implementation steps
-- cloud_providers: Array of relevant cloud providers (AWS, Azure, GCP, etc.)
+Rules:
+1) Respect INDUSTRY compliance/latency constraints — do not suggest shortcuts that break PCI/HIPAA-style boundaries if the vertical implies them.
+2) At least 2 items should target enterprise FinOps mechanics (tagging/chargeback anomaly detection, commitment coverage vs baseline, sandbox controls) when plausible.
+3) At least 2 items should be observability/storage/network efficiency if billing suggests logs, metrics, S3, or data transfer.
+4) Tie savings to billing SKUs where possible (name the service from line items).
 
-INTELLIGENT ANALYSIS FOCUS:
-1. **Open-source alternatives** to any paid services (PostgreSQL, MongoDB, Redis, etc.)
-2. **Free tier opportunities** across all cloud providers
-3. **Alternative cloud providers** with better pricing
-4. **Architecture optimizations** (serverless, containers, microservices)
-5. **Resource right-sizing** based on actual usage patterns
-6. **Cost-effective storage solutions** (object storage, CDN, etc.)
-7. **Database optimization** strategies
-8. **Monitoring and logging** cost reductions
-9. **Network and bandwidth** optimizations
-10. **Development vs production** environment strategies
-
-CONSIDER:
-- Budget constraints and variance
-- Project requirements and constraints
-- Technology stack compatibility
-- Migration complexity and risks
-- Long-term cost implications
-- Performance impact
-- Free tier limits and restrictions
-
-OUTPUT: Only valid JSON array, no explanations or markdown.
-"""
-                }
+OUTPUT: JSON array ONLY, no markdown or commentary.
+""",
+                },
             ]
-            
-            resp = self.client.chat_completion(messages=messages, max_tokens=1500)
-            
-            # Handle different response formats
-            if hasattr(resp, 'choices') and resp.choices:
-                raw_output = resp.choices[0].message["content"]
-            elif hasattr(resp, 'generated_text'):
-                raw_output = resp.generated_text
-            else:
-                raw_output = str(resp)
-            
+
+            raw_output = chat_completion(messages, max_tokens=2400, temperature=0.25)
+
             print(f"Raw LLM response (preview): {raw_output[:300]}...")
             
             # Clean the response
@@ -145,9 +208,14 @@ OUTPUT: Only valid JSON array, no explanations or markdown.
             print(f"Cleaned response (preview): {cleaned[:300]}...")
             
             if cleaned and cleaned.startswith('['):
-                recommendations = json.loads(cleaned)
-                print(f"Successfully parsed {len(recommendations)} LLM recommendations")
-                return recommendations
+                raw_recs = json.loads(cleaned)
+                normalized: List[Dict[str, Any]] = []
+                for item in raw_recs:
+                    norm = self._normalize_recommendation(item, analysis)
+                    if norm:
+                        normalized.append(norm)
+                print(f"Successfully parsed {len(normalized)} LLM recommendations")
+                return normalized
             else:
                 print("Error: Invalid JSON response from LLM")
                 raise ValueError("Invalid JSON response from LLM")
@@ -196,12 +264,20 @@ OUTPUT: Only valid JSON array, no explanations or markdown.
         
         analysis = self.analyze_costs(data)
         recommendations = self.generate_optimization_recommendations(analysis, data)
-        
+
+        industry_id = load_selected_industry_id()
+        ind = get_playbook(industry_id)
+
         # Calculate total potential savings
         total_potential_savings = sum(rec.get("potential_savings", 0) for rec in recommendations)
-        
+
         report = {
             "project_name": data["profile"].get("name", "Unknown Project"),
+            "meta": {
+                "industry_vertical_id": industry_id,
+                "industry_label": ind.get("label", industry_id),
+                "generator": "analyze_billing.CostAnalyzer",
+            },
             "analysis": analysis,
             "recommendations": recommendations,
             "summary": {
@@ -211,14 +287,15 @@ OUTPUT: Only valid JSON array, no explanations or markdown.
                 "high_impact_recommendations": len([r for r in recommendations if r.get("potential_savings", 0) > 1000])
             }
         }
-        
+
         return report
 
     def save_report(self, report: Dict[str, Any], filename: str = "cost_optimization_report.json"):
         """Save the cost optimization report to file"""
-        with open(filename, "w", encoding="utf-8") as f:
+        out = data_path(filename) if not os.path.isabs(filename) else filename
+        with open(out, "w", encoding="utf-8") as f:
             json.dump(report, f, indent=2, ensure_ascii=False)
-        print(f"Cost optimization report saved to {filename}")
+        print(f"Cost optimization report saved to {out}")
 
 def main():
     """Main function to run cost analysis"""

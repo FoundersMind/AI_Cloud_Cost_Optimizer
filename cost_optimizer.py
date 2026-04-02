@@ -5,12 +5,17 @@ import sys
 from typing import Dict, Any, List
 from datetime import datetime
 
+from app_paths import ROOT, data_path
+from console_encoding import ensure_utf8_stdio
+
+ensure_utf8_stdio()
+
 class CostOptimizer:
     def __init__(self):
-        self.project_description_file = "project_description.txt"
-        self.project_profile_file = "project_profile.json"
-        self.billing_file = "mock_billing.json"
-        self.report_file = "cost_optimization_report.json"
+        self.project_description_file = data_path("project_description.txt")
+        self.project_profile_file = data_path("project_profile.json")
+        self.billing_file = data_path("mock_billing.json")
+        self.report_file = data_path("cost_optimization_report.json")
         
     def display_banner(self):
         """Display welcome banner"""
@@ -55,8 +60,15 @@ class CostOptimizer:
         print(f"\n🔄 Running {step_name}...")
         try:
             import subprocess
-            result = subprocess.run([sys.executable, script_name], 
-                                  capture_output=True, text=True, check=True)
+            result = subprocess.run(
+                [sys.executable, script_name],
+                cwd=ROOT,
+                capture_output=True,
+                text=True,
+                encoding="utf-8",
+                errors="replace",
+                check=True,
+            )
             print(f"✅ {step_name} completed successfully")
             if result.stdout:
                 print(result.stdout)
@@ -165,13 +177,13 @@ class CostOptimizer:
             timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
             
             if format_type.lower() == "json":
-                filename = f"cost_report_{timestamp}.json"
+                filename = data_path(f"cost_report_{timestamp}.json")
                 with open(filename, "w", encoding="utf-8") as f:
                     json.dump(report, f, indent=2, ensure_ascii=False)
                 print(f"✅ Report exported to {filename}")
                 
             elif format_type.lower() == "txt":
-                filename = f"cost_report_{timestamp}.txt"
+                filename = data_path(f"cost_report_{timestamp}.txt")
                 with open(filename, "w", encoding="utf-8") as f:
                     f.write("AWS COST OPTIMIZATION REPORT\n")
                     f.write("=" * 50 + "\n\n")
