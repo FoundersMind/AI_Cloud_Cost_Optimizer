@@ -6,6 +6,13 @@ from typing import Dict, Any, List
 from datetime import datetime
 
 from app_paths import ROOT, data_path
+from cloud_agents import (
+    CLOUD_LABELS,
+    CLOUD_PROVIDER_IDS,
+    load_selected_cloud_provider,
+    normalize_cloud_provider,
+    save_cloud_selection,
+)
 from console_encoding import ensure_utf8_stdio
 
 ensure_utf8_stdio()
@@ -20,10 +27,12 @@ class CostOptimizer:
     def display_banner(self):
         """Display welcome banner"""
         print("=" * 60)
-        print("🚀 AWS COST OPTIMIZER FOR INTERNS")
+        print("🚀 MULTI-CLOUD COST OPTIMIZER FOR INTERNS")
         print("=" * 60)
+        cc = load_selected_cloud_provider()
+        print(f"Active billing agent: {CLOUD_LABELS.get(cc, cc)} (change with menu 0)")
         print("This tool helps you optimize cloud costs by:")
-        print("• Analyzing your project's AWS usage")
+        print("• Analyzing your project's usage on AWS, Azure, or GCP")
         print("• Recommending open-source alternatives")
         print("• Suggesting cost optimization strategies")
         print("• Providing implementation guidance")
@@ -218,11 +227,34 @@ class CostOptimizer:
         except Exception as e:
             print(f"❌ Error exporting report: {e}")
 
+    def set_cloud_provider_cli(self) -> None:
+        """Pick AWS / Azure / GCP for synthetic billing + analysis agents."""
+        print("\n☁️  PRIMARY CLOUD PROVIDER")
+        print("-" * 30)
+        for i, cid in enumerate(CLOUD_PROVIDER_IDS, 1):
+            print(f"  {i}. {CLOUD_LABELS[cid]}")
+        raw = input("\nSelect cloud (1-3) or press Enter to keep current: ").strip()
+        if not raw:
+            print(f"Keeping: {CLOUD_LABELS[load_selected_cloud_provider()]}")
+            return
+        try:
+            n = int(raw)
+            if 1 <= n <= len(CLOUD_PROVIDER_IDS):
+                save_cloud_selection(CLOUD_PROVIDER_IDS[n - 1])
+                print(f"✅ Set to: {CLOUD_LABELS[CLOUD_PROVIDER_IDS[n - 1]]}")
+                return
+        except ValueError:
+            pass
+        alt = normalize_cloud_provider(raw)
+        save_cloud_selection(alt)
+        print(f"✅ Set to: {CLOUD_LABELS.get(alt, alt)}")
+
     def show_menu(self):
         """Display main menu"""
         while True:
             print("\n🎛️  MAIN MENU")
             print("-" * 20)
+            print("0. ☁️  Set primary cloud (AWS / Azure / GCP)")
             print("1. 📝 Enter New Project Description")
             print("2. 🔄 Run Complete Cost Analysis")
             print("3. 📊 View Analysis Summary")
@@ -231,9 +263,12 @@ class CostOptimizer:
             print("6. ❓ Help")
             print("7. 🚪 Exit")
             
-            choice = input("\nSelect an option (1-7): ").strip()
+            choice = input("\nSelect an option (0-7): ").strip()
             
-            if choice == "1":
+            if choice == "0":
+                self.set_cloud_provider_cli()
+            
+            elif choice == "1":
                 description = self.get_user_input()
                 if description:
                     self.save_project_description(description)
@@ -282,31 +317,31 @@ class CostOptimizer:
                 self.show_help()
                 
             elif choice == "7":
-                print("\n👋 Thank you for using AWS Cost Optimizer!")
+                print("\n👋 Thank you for using Multi-Cloud Cost Optimizer!")
                 break
                 
             else:
-                print("❌ Invalid choice. Please select 1-7.")
+                print("❌ Invalid choice. Please select 0-7.")
 
     def show_help(self):
         """Display help information"""
-        print("\n❓ HELP - AWS COST OPTIMIZER")
+        print("\n❓ HELP - MULTI-CLOUD COST OPTIMIZER")
         print("=" * 40)
         print("This tool helps interns learn cloud cost optimization by:")
         print()
         print("1. 📝 PROJECT DESCRIPTION:")
         print("   - Describe your project, tech stack, and budget")
-        print("   - Include AWS services you plan to use")
+        print("   - Include cloud services you plan to use")
         print("   - Mention any specific requirements")
         print()
         print("2. 🔄 COST ANALYSIS:")
-        print("   - Generates synthetic AWS billing data")
+        print("   - Generates synthetic billing for your selected cloud (menu 0)")
         print("   - Analyzes costs against your budget")
         print("   - Identifies optimization opportunities")
         print()
         print("3. 📊 RECOMMENDATIONS:")
         print("   - Open-source alternatives to paid services")
-        print("   - AWS service optimizations")
+        print("   - Provider-native optimizations (AWS / Azure / GCP)")
         print("   - Architecture improvements")
         print("   - Implementation guidance")
         print()

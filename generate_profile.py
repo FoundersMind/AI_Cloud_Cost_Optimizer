@@ -11,6 +11,8 @@ from console_encoding import ensure_utf8_stdio
 ensure_utf8_stdio()
 
 from groq_llm import chat_completion
+from cloud_agents import load_selected_cloud_provider, normalize_cloud_provider
+
 load_dotenv(data_path(".env"))
 
 def clean_json_response(text):
@@ -34,9 +36,10 @@ def clean_json_response(text):
 try:
     with open(data_path("project_description.txt"), "r", encoding="utf-8") as f:
         desc_text = f.read().strip()
-    
+
+    selected_cloud = load_selected_cloud_provider()
     print("Generating project profile...")
-    
+
     messages = [
             {
                 "role": "system",
@@ -50,9 +53,13 @@ Convert the following project description into valid JSON.
 Project Description:
 {desc_text}
 
+User-selected primary cloud (use this value unless the description clearly contradicts with a different single cloud):
+"{selected_cloud}"  → must be one of: "aws", "azure", "gcp"
+
 Fields to extract:
 - name (short project name)
 - budget_inr_per_month (extract number from description)
+- primary_cloud_provider (string: exactly one of aws, azure, gcp — prefer "{selected_cloud}" when ambiguous)
 - description (original description)
 - tech_stack (object with categories like backend, database, monitoring, storage)
 - non_functional_requirements (array of keywords like scalability, real_time, cost_optimization)
@@ -87,12 +94,23 @@ Rules:
         sys.exit(1)
     
     # Ensure required fields exist
-    required_keys = ["name", "budget_inr_per_month", "description", "tech_stack", "non_functional_requirements"]
+    required_keys = [
+        "name",
+        "budget_inr_per_month",
+        "primary_cloud_provider",
+        "description",
+        "tech_stack",
+        "non_functional_requirements",
+    ]
     for k in required_keys:
         if k not in profile:
             print(f"Error: Missing required key in profile: {k}")
             sys.exit(1)
-    
+
+    profile["primary_cloud_provider"] = normalize_cloud_provider(
+        profile.get("primary_cloud_provider") or selected_cloud
+    )
+
     # Save profile
     with open(data_path("project_profile.json"), "w", encoding="utf-8") as f:
         json.dump(profile, f, indent=2, ensure_ascii=False)

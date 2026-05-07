@@ -1,6 +1,5 @@
-# generate_billing.py - Generate synthetic AWS billing data with error handling
+# generate_billing.py - Generate synthetic multi-cloud billing data (AWS / Azure / GCP)
 import json
-import os
 import re
 import random
 from datetime import datetime, timedelta
@@ -14,6 +13,11 @@ from console_encoding import ensure_utf8_stdio
 ensure_utf8_stdio()
 from groq_llm import chat_completion
 from industry_playbooks import load_selected_industry_id, playbook_prompt_block
+from cloud_agents import (
+    build_billing_messages,
+    load_selected_cloud_provider,
+    normalize_cloud_provider,
+)
 
 # Load .env file
 load_dotenv(data_path(".env"))
@@ -53,65 +57,19 @@ try:
     industry_id = load_selected_industry_id()
     industry_block = playbook_prompt_block(industry_id)
 
-    print("Generating synthetic cloud billing data...")
-    
+    cloud = normalize_cloud_provider(
+        profile.get("primary_cloud_provider") or load_selected_cloud_provider()
+    )
+    profile["primary_cloud_provider"] = cloud
+    with open(data_path("project_profile.json"), "w", encoding="utf-8") as f:
+        json.dump(profile, f, indent=2, ensure_ascii=False)
+
+    print(f"Generating synthetic billing via {cloud.upper()} agent...")
+
     # LLM-only generation
     try:
-        messages = [
-            {
-                "role": "system",
-                "content": """You are an expert cloud billing analyst who generates realistic, comprehensive billing data for cloud projects. You understand all major cloud providers (AWS, Azure, GCP, Oracle Cloud, DigitalOcean, etc.) and create detailed, realistic billing scenarios that reflect actual production usage patterns."""
-            },
-            {
-                "role": "user",
-                "content": f"""
-Generate comprehensive, realistic cloud billing data for this project:
+        messages = build_billing_messages(profile, industry_block, cloud)
 
-PROJECT PROFILE:
-{json.dumps(profile, indent=2)}
-
-INDUSTRY_CONTEXT (bias cost drivers & service mix toward this vertical):
-{industry_block}
-
-REQUIREMENTS:
-- Generate 12-20 realistic billing records
-- Each record must include ALL these fields:
-  - month: Current month (e.g., "2025-01")
-  - service: Cloud service name (EC2, RDS, S3, Lambda, CloudWatch, etc.)
-  - resource_id: Realistic resource identifier (e.g., "i-ecommerce-web-01", "db-prod-mysql")
-  - region: AWS region (e.g., "ap-south-1", "us-east-1")
-  - usage_type: Specific usage type (e.g., "Linux/UNIX (on-demand)", "Storage:Standard")
-  - usage_quantity: Realistic usage number
-  - unit: Appropriate unit (hours, GB, requests, etc.)
-  - cost_inr: Realistic cost in INR based on budget allocation
-  - desc: Detailed description of what this resource does
-
-BILLING DISTRIBUTION GUIDELINES:
-- Compute (EC2/Lambda): 40-50% of budget
-- Database (RDS): 20-25% of budget  
-- Storage (S3): 10-15% of budget
-- Network (CloudFront, ELB): 8-12% of budget
-- Monitoring (CloudWatch): 5-8% of budget
-- Other services: 5-10% of budget
-
-REALISTIC SCENARIOS TO INCLUDE:
-- Multiple EC2 instances (web, API, dev environments)
-- Database instances with backups
-- Multiple S3 buckets (uploads, backups, logs)
-- Lambda functions for different purposes
-- CloudWatch logs and metrics
-- Load balancers and CDN
-- DNS, email, and notification services
-- Development and staging environments
-- Where the vertical implies it (e.g., retail: CDN/edge-heavy; fintech: egress + KMS; healthcare: storage + audit logs), overweight those line items modestly but keep totals plausible vs budget.
-
-TOTAL BUDGET: ₹{profile.get('budget_inr_per_month', 20000):,}
-
-OUTPUT: Only valid JSON array, no explanations or markdown.
-"""
-            }
-        ]
-        
         raw_output = chat_completion(messages, max_tokens=2000, temperature=0.25)
 
         print(f"Raw LLM response (preview): {raw_output[:300]}...")
@@ -152,6 +110,8 @@ OUTPUT: Only valid JSON array, no explanations or markdown.
             record['month'] = datetime.now().strftime("%Y-%m")
         if 'cost_inr' not in record:
             record['cost_inr'] = random.randint(500, 5000)
+        if not record.get("cloud_provider"):
+            record["cloud_provider"] = cloud
     
     # Save billing data
     with open(data_path("mock_billing.json"), "w", encoding="utf-8") as f:

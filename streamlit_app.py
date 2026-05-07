@@ -16,6 +16,12 @@ import streamlit as st
 from dotenv import load_dotenv
 
 from app_paths import ROOT, data_path
+from cloud_agents import (
+    CLOUD_LABELS,
+    CLOUD_PROVIDER_IDS,
+    load_selected_cloud_provider,
+    save_cloud_selection,
+)
 from groq_llm import default_model
 from industry_playbooks import INDUSTRY_IDS, get_playbook
 
@@ -321,6 +327,10 @@ def _industry_label(vid: str) -> str:
     return get_playbook(vid)["label"]
 
 
+def _cloud_label(cid: str) -> str:
+    return CLOUD_LABELS.get(cid, cid)
+
+
 def _save_industry(vertical_id: str) -> None:
     with open(data_path("industry_selection.json"), "w", encoding="utf-8") as f:
         json.dump({"vertical_id": vertical_id}, f, indent=2)
@@ -368,12 +378,22 @@ def _load_billing_preview() -> Optional[List[Dict[str, Any]]]:
 _hero(
     "FinOps intelligence",
     "Cloud cost clarity that reads like a leadership brief.",
-    "Describe your workload once—get industry-aware scenarios, spend breakdowns, and a prioritized savings backlog "
+    "Describe your workload once—pick **AWS, Azure, or GCP** to route the synthetic billing agent and FinOps prompts. "
+    "You get industry-aware scenarios, spend breakdowns, and a prioritized savings backlog "
     "with effort, risk, and KPI language suited for stakeholder reviews. Synthetic billing until you wire real CUR/exports.",
 )
 
 with st.sidebar:
     st.markdown("### Context")
+    current_cloud = load_selected_cloud_provider()
+    cidx = CLOUD_PROVIDER_IDS.index(current_cloud) if current_cloud in CLOUD_PROVIDER_IDS else 0
+    cloud_pick = st.selectbox(
+        "Primary cloud (agent routing)",
+        options=list(CLOUD_PROVIDER_IDS),
+        index=cidx,
+        format_func=_cloud_label,
+        help="Synthetic billing and recommendations use provider-native SKUs and FinOps language for this cloud.",
+    )
     vertical = st.selectbox(
         "Industry vertical",
         options=INDUSTRY_IDS,
@@ -423,16 +443,18 @@ if save_ctx:
     with open(_path_desc, "w", encoding="utf-8") as f:
         f.write(desc)
     _save_industry(vertical)
+    save_cloud_selection(cloud_pick)
     st.toast("Context saved.", icon="✅")
 
 if run_btn:
     with open(_path_desc, "w", encoding="utf-8") as f:
         f.write(desc)
     _save_industry(vertical)
+    save_cloud_selection(cloud_pick)
     with st.status("Running pipeline…", expanded=True) as status:
-        st.write("**generate_profile** → structured profile")
-        st.write("**generate_billing** → synthetic line items")
-        st.write("**analyze_billing** → Groq-backed backlog")
+        st.write("**generate_profile** → structured profile + `primary_cloud_provider`")
+        st.write(f"**generate_billing** → `{_cloud_label(cloud_pick)}` billing agent")
+        st.write("**analyze_billing** → Groq-backed backlog (cloud-aware)")
         ok, pipeline_log = _run_pipeline()
         if ok:
             status.update(label="Pipeline complete", state="complete", expanded=False)
@@ -474,10 +496,13 @@ meta = report.get("meta") or {}
 _meta_line = ""
 if meta.get("industry_label"):
     _meta_line = meta.get("industry_label", "")
+if meta.get("cloud_label"):
+    cl = meta.get("cloud_label", "")
+    _meta_line = f"{_meta_line} · **{cl}**" if _meta_line else f"**{cl}**"
 
 _section_title("02 · Executive snapshot", "KPIs & spend shape")
 if _meta_line:
-    st.caption(f"Report vertical · **{_meta_line}**")
+    st.caption(f"Report · {_meta_line}")
 
 an = report.get("analysis", {})
 su = report.get("summary", {})

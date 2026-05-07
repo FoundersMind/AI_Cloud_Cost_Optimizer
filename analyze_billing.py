@@ -7,6 +7,13 @@ from dotenv import load_dotenv
 from app_paths import data_path
 from console_encoding import ensure_utf8_stdio
 from groq_llm import chat_completion
+from cloud_agents import (
+    CLOUD_LABELS,
+    analysis_provider_context,
+    load_selected_cloud_provider,
+    normalize_cloud_provider,
+    provider_display_names,
+)
 from industry_playbooks import (
     get_playbook,
     load_selected_industry_id,
@@ -83,7 +90,12 @@ class CostAnalyzer:
             "is_over_budget": budget_variance > 0
         }
 
-    def _normalize_recommendation(self, rec: Any, analysis: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+    def _normalize_recommendation(
+        self,
+        rec: Any,
+        analysis: Dict[str, Any],
+        default_cloud_id: str,
+    ) -> Optional[Dict[str, Any]]:
         if not isinstance(rec, dict):
             return None
         title = rec.get("title") or rec.get("name") or "Optimization initiative"
@@ -114,6 +126,8 @@ class CostAnalyzer:
         if not isinstance(providers, list):
             providers = []
         providers = [str(p) for p in providers if p][:6]
+        if not providers:
+            providers = provider_display_names(default_cloud_id)
         strategic_theme = rec.get("strategic_theme") or "workload_efficiency"
         finops_practice = rec.get("finops_practice") or "optimize_usage"
         business_kpi_hint = rec.get("business_kpi_hint") or ""
@@ -128,7 +142,7 @@ class CostAnalyzer:
             "implementation_effort": effort,
             "risk_level": risk,
             "steps": steps,
-            "cloud_providers": providers or ["AWS"],
+            "cloud_providers": providers,
             "strategic_theme": str(strategic_theme)[:120],
             "finops_practice": str(finops_practice)[:120],
             "business_kpi_hint": str(business_kpi_hint)[:240],
@@ -140,6 +154,11 @@ class CostAnalyzer:
         billing = data["billing"]
         industry_id = load_selected_industry_id()
         industry_block = playbook_prompt_block(industry_id)
+        primary_cloud = normalize_cloud_provider(
+            profile.get("primary_cloud_provider") or load_selected_cloud_provider()
+        )
+        profile["primary_cloud_provider"] = primary_cloud
+        cloud_ctx = analysis_provider_context(primary_cloud)
 
         # LLM-only recommendations
         try:
@@ -160,6 +179,10 @@ class CostAnalyzer:
                     "role": "user",
                     "content": f"""
 Analyze this organization's cloud spend and produce an ENTERPRISE-GRADE savings backlog.
+
+PRIMARY_CLOUD: {primary_cloud} ({CLOUD_LABELS[primary_cloud]})
+PRIMARY_CLOUD_GUIDANCE:
+{cloud_ctx}
 
 INDUSTRY_CONTEXT:
 {industry_block}
@@ -191,8 +214,9 @@ TASK: Return 8-12 recommendations as a JSON array. Each item must be a JSON obje
 Rules:
 1) Respect INDUSTRY compliance/latency constraints — do not suggest shortcuts that break PCI/HIPAA-style boundaries if the vertical implies them.
 2) At least 2 items should target enterprise FinOps mechanics (tagging/chargeback anomaly detection, commitment coverage vs baseline, sandbox controls) when plausible.
-3) At least 2 items should be observability/storage/network efficiency if billing suggests logs, metrics, S3, or data transfer.
+3) At least 2 items should be observability/storage/network efficiency if billing suggests logs, metrics, object storage, or data transfer.
 4) Tie savings to billing SKUs where possible (name the service from line items).
+5) Prioritize initiatives for PRIMARY_CLOUD ({CLOUD_LABELS[primary_cloud]}); use native SKU and discount names from that provider in descriptions.
 
 OUTPUT: JSON array ONLY, no markdown or commentary.
 """,
@@ -211,7 +235,7 @@ OUTPUT: JSON array ONLY, no markdown or commentary.
                 raw_recs = json.loads(cleaned)
                 normalized: List[Dict[str, Any]] = []
                 for item in raw_recs:
-                    norm = self._normalize_recommendation(item, analysis)
+                    norm = self._normalize_recommendation(item, analysis, primary_cloud)
                     if norm:
                         normalized.append(norm)
                 print(f"Successfully parsed {len(normalized)} LLM recommendations")
@@ -267,6 +291,9 @@ OUTPUT: JSON array ONLY, no markdown or commentary.
 
         industry_id = load_selected_industry_id()
         ind = get_playbook(industry_id)
+        primary_cloud = normalize_cloud_provider(
+            data["profile"].get("primary_cloud_provider") or load_selected_cloud_provider()
+        )
 
         # Calculate total potential savings
         total_potential_savings = sum(rec.get("potential_savings", 0) for rec in recommendations)
@@ -276,6 +303,8 @@ OUTPUT: JSON array ONLY, no markdown or commentary.
             "meta": {
                 "industry_vertical_id": industry_id,
                 "industry_label": ind.get("label", industry_id),
+                "cloud_provider": primary_cloud,
+                "cloud_label": CLOUD_LABELS.get(primary_cloud, primary_cloud),
                 "generator": "analyze_billing.CostAnalyzer",
             },
             "analysis": analysis,
