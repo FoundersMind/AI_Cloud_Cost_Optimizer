@@ -1,50 +1,64 @@
-# AWS Cost Optimizer for Interns
+# Multi-Cloud AI Cost Optimizer (FinOps Lab)
 
-A comprehensive tool designed to help interns learn cloud cost optimization by analyzing their projects and providing actionable recommendations for reducing AWS costs through open-source alternatives and optimization strategies.
+A learning-oriented tool that turns a **plain-language workload description** into **structured profile**, **synthetic billing line items**, and an **enterprise-style savings backlog**—using **Groq (LLM)**. It supports **AWS**, **Microsoft Azure**, and **Google Cloud** through **per-cloud prompt agents** (different billing shapes and FinOps language per provider).
+
+> **Important:** Billing data is **synthetic** unless you plug in real exports (CUR, Azure Cost Management, GCP billing export). The app does **not** connect to your cloud accounts by default.
 
 ## What This Tool Does
 
-This cost optimizer helps Companies understand how to:
-- **Analyze AWS costs** for their projects
-- **Identify cost optimization opportunities** 
-- **Find open-source alternatives** to paid AWS services
-- **Implement cost-effective solutions** with step-by-step guidance
-- **Learn best practices** for cloud cost management
+- **Analyze** simulated spend against your stated **monthly budget (INR)**.
+- **Route** generation and recommendations by **primary cloud**: AWS, Azure, or GCP.
+- **Bias** scenarios with an **industry vertical** (fintech, healthcare, retail, etc.) via `industry_playbooks.py`.
+- **Surface** recommendations with effort, risk, FinOps themes, and implementation steps.
+- **Run** from a **Streamlit dashboard** or a **CLI** menu.
+
+## Multi-Cloud “Agents”
+
+Each provider uses a dedicated **agent** in code (`cloud_agents.py`): its own system prompt and billing schema (e.g. Azure ARM-style resources, GCP project/zone paths, AWS-style CUR line items).  
+
+- **Streamlit:** Sidebar — **Primary cloud (agent routing)**.  
+- **CLI:** Menu **0** — **Set primary cloud**.  
+
+Selection is stored in **`cloud_selection.json`** (gitignored, like `industry_selection.json`). The profile step records **`primary_cloud_provider`** (`aws` | `azure` | `gcp`) in `project_profile.json`.
 
 ## System Architecture
 
 ```
-Project Description → Profile Generation → Billing Analysis → Cost Optimization
-     ↓                      ↓                    ↓                    ↓
-User Input          Structured Data      Synthetic AWS Data    Recommendations
+Project Description + Industry + Cloud
+        ↓
+ Profile (LLM)  →  Synthetic billing (LLM, per-cloud agent)  →  Analysis + backlog (LLM)
+        ↓                      ↓                                        ↓
+ project_profile.json    mock_billing.json              cost_optimization_report.json
 ```
 
 ## Project Structure
 
 ```
-cost-optimizer/
-├── streamlit_app.py           # Main app (dashboard) — use for Streamlit Cloud
-├── cost_optimizer.py          # Legacy CLI menu
-├── generate_profile.py        # Extracts structured data from project description
-├── generate_billing.py        # Generates synthetic AWS billing data
-├── analyze_billing.py         # Analyzes costs and generates recommendations
+├── streamlit_app.py           # Dashboard (Streamlit Cloud entry: this file)
+├── cost_optimizer.py          # CLI menu (option 0 = cloud provider)
+├── generate_profile.py        # Description → project_profile.json (+ primary_cloud_provider)
+├── generate_billing.py        # Synthetic billing for active cloud agent
+├── analyze_billing.py         # Cost rollup + Groq-backed recommendations
+├── cloud_agents.py            # Per-cloud prompts, selection helpers, routing
 ├── groq_llm.py                # Groq API chat completions
-├── industry_playbooks.py      # Industry-specific FinOps context
-├── project_description.txt    # User's project description (generated, gitignored)
-├── project_profile.json       # Structured project data (gitignored)
-├── mock_billing.json          # Generated AWS billing data (gitignored)
-├── cost_optimization_report.json # Final analysis report (gitignored)
-├── requirements.txt           # Python dependencies
-└── README.md                  # This file
+├── industry_playbooks.py     # Industry-specific FinOps context
+├── project_description.txt   # Input narrative (gitignored when generated)
+├── project_profile.json       # Structured profile (gitignored)
+├── cloud_selection.json      # aws | azure | gcp (gitignored)
+├── industry_selection.json   # Vertical id (gitignored)
+├── mock_billing.json         # Synthetic line items (gitignored)
+├── cost_optimization_report.json
+├── requirements.txt
+└── README.md
 ```
 
 ## Deploy on Streamlit Community Cloud
 
 1. Push this repo to GitHub.
 2. Open [Streamlit Community Cloud](https://share.streamlit.io/) and sign in with GitHub.
-3. **Create app** → select the repository and branch **main**.
+3. **Create app** → repository and branch **main**.
 4. **Main file path:** `streamlit_app.py`
-5. **App settings (⋮) → Secrets** — add your Groq key (see [.streamlit/secrets.toml.example](.streamlit/secrets.toml.example)):
+5. **App settings (⋮) → Secrets** — see [.streamlit/secrets.toml.example](.streamlit/secrets.toml.example):
 
    ```toml
    GROQ_API_KEY = "gsk_..."
@@ -65,239 +79,142 @@ cost-optimizer/
 ### 1. Installation
 
 ```bash
-# Clone or download the project
-cd cost-optimizer
-
-# Install dependencies
+git clone https://github.com/FoundersMind/AI_Cloud_Cost_Optimizer.git
+cd AI_Cloud_Cost_Optimizer
 pip install -r requirements.txt
 ```
 
 ### 2. Setup
 
-Create a `.env` file in the project folder (or use Streamlit secrets locally — see [.streamlit/secrets.toml.example](.streamlit/secrets.toml.example)):
+Create a `.env` in the project folder (or use Streamlit secrets locally):
 
 ```env
 GROQ_API_KEY=your_groq_key
 # optional: GROQ_MODEL=llama-3.3-70b-versatile
 ```
 
-Get a key from the [Groq console](https://console.groq.com/keys).
+Key: [Groq console](https://console.groq.com/keys).
 
-### 3. Run the app (dashboard)
+### 3. Run the dashboard
 
 ```bash
 streamlit run streamlit_app.py
 ```
 
-### 4. Run the legacy CLI
+In the sidebar, choose **industry vertical** and **primary cloud**, enter your workload narrative, then **Save context** and **Run full analysis**.
+
+### 4. Run the CLI
 
 ```bash
 python cost_optimizer.py
 ```
 
+Use **0** to set **AWS / Azure / GCP**, then **2** for the full pipeline (`generate_profile` → `generate_billing` → `analyze_billing`).
+
 ## How to Use
 
-### Step 1: Enter Project Description
-When you run the tool, you'll be prompted to describe your project. Include:
+### Step 1: Describe the workload
 
-- **What you're building** (e.g., "real-time employee tracking system")
-- **Tech stack** (e.g., "FastAPI, PostgreSQL, MongoDB, CloudWatch, S3")
-- **Monthly budget** (e.g., "20,000 INR")
-- **Specific requirements** (e.g., "real-time monitoring, transactional consistency")
+Include:
 
-**Example:**
-```
-We are building a real-time employee tracking system. 
-Backend is FastAPI in Python, database is PostgreSQL on AWS RDS, 
-logs in MongoDB, monitoring via CloudWatch, storage in S3. 
-Monthly budget is 20,000 INR, system must guarantee transactional 
-consistency and real-time monitoring.
-```
+- What you are building and **which cloud** you use (or rely on the sidebar/CLI selection).
+- **Tech stack** (compute, data, storage, observability).
+- **Monthly budget in INR**, regions, SLOs, compliance (PCI, HIPAA, etc.) if relevant.
 
-### Step 2: Run Cost Analysis
-The tool will automatically:
-1. **Extract structured data** from your description
-2. **Generate synthetic AWS billing data** based on your tech stack
-3. **Analyze costs** against your budget
-4. **Generate optimization recommendations**
-
-### Step 3: Review Recommendations
-The tool provides:
-- **Cost analysis summary** with budget comparison
-- **Detailed recommendations** with implementation steps
-- **Open-source alternatives** to paid services
-- **Optimization strategies** for existing services
-
-## Types of Recommendations
-
-### 1. Open Source Alternatives
-- **MongoDB** → Self-hosted MongoDB or Docker containers
-- **CloudWatch** → Prometheus + Grafana or ELK Stack
-- **S3** → MinIO or Cloudflare R2
-- **RDS** → Self-hosted PostgreSQL with proper backup
-
-### 2. AWS Service Optimizations
-- **EC2** → Spot Instances, Reserved Instances, Auto Scaling
-- **RDS** → Aurora Serverless, Read Replicas optimization
-- **S3** → Intelligent Tiering, Lifecycle Policies
-- **CloudWatch** → Log retention optimization, Custom metrics
-
-### 3. Architecture Improvements
-- **Right-sizing** instances based on actual usage
-- **Auto-scaling** to match demand patterns
-- **Connection pooling** for database efficiency
-- **Caching strategies** to reduce API calls
-
-## Sample Output
+**Example (Azure fintech sketch):**
 
 ```
-COST ANALYSIS RESULTS
+PCI-scoped payments API on Azure (East US + Central India). .NET on App Service,
+Azure SQL vCore, Redis, Application Insights, Blob for receipts.
+Budget ₹4,50,000/month, 99.9% uptime, long audit retention.
+```
+
+### Step 2: Run analysis
+
+1. Extract **structured profile** (including `primary_cloud_provider`).
+2. Generate **12–20 synthetic line items** in that cloud’s style (services, regions, `cost_inr`).
+3. Compare totals to budget and produce **8–12 recommendations** (rightsizing, commitments, storage lifecycle, observability cost, tagging, etc.).
+
+### Step 3: Review output
+
+- **Streamlit:** KPIs, spend mix chart, filters, top initiatives, JSON download.
+- **JSON report** `cost_optimization_report.json` includes **`meta.cloud_provider`** and **`meta.cloud_label`**.
+
+## Types of Recommendations (examples)
+
+Recommendations are LLM-generated and normalized to types such as: `open_source`, `optimization`, `right_sizing`, `commitment_discount`, `governance_tagging`, `observability_efficiency`, and others. Wording should match the **selected cloud** (e.g. Azure Hybrid Benefit / reservations, GCP CUDs, AWS Savings Plans / RIs).
+
+## Sample CLI-style output
+
+```
+COST ANALYSIS SUMMARY
 ==================================================
-Project: Employee Tracking System
-Current Monthly Cost: ₹18,500.00
-Budget: ₹20,000.00
-Under Budget by: ₹1,500.00
-
-OPTIMIZATION OPPORTUNITIES
-Total Potential Savings: ₹7,200.00
-Savings Percentage: 38.9%
-Recommendations Available: 6
-
-TOP 3 RECOMMENDATIONS:
-
-1. Switch to Open Source Alternative for MongoDB
-   Savings: ₹4,500.00
-   Type: open_source
-   Consider using Self-hosted MongoDB, Docker MongoDB instead of MongoDB Atlas
-
-2. Optimize EC2 Configuration
-   Savings: ₹2,100.00
-   Type: optimization
-   Implement cost optimization strategies: Right-size instances, Use auto-scaling, Implement proper monitoring
-
-3. Switch to Open Source Alternative for CloudWatch
-   Savings: ₹600.00
-   Type: open_source
-   Consider using Prometheus + Grafana, ELK Stack instead of CloudWatch
+Project: Payments API
+Current Monthly Cost (INR): ...
+Budget (INR): ...
+Potential Savings (INR): ...
+Report meta includes cloud_provider / cloud_label (e.g. azure / Microsoft Azure)
 ```
 
 ## Advanced Usage
 
-### Export Reports
-The tool can export detailed reports in multiple formats:
-- **JSON format** for programmatic analysis
-- **Text format** for sharing with team/mentors
+### Run steps individually
 
-### Custom Analysis
-You can run individual components:
 ```bash
-# Generate project profile only
 python generate_profile.py
-
-# Generate billing data only
 python generate_billing.py
-
-# Run cost analysis only
 python analyze_billing.py
 ```
 
+Ensure `project_description.txt` exists and `cloud_selection.json` reflects your cloud before profile/billing if you rely on UI defaults.
+
+### Export
+
+- **Streamlit:** Download report JSON from the app.
+- **CLI:** Menu **5** (JSON / text export).
+
 ## Learning Objectives
 
-This tool helps Companies learn:
-
-1. **Cloud Cost Awareness**
-   - Understanding AWS pricing models
-   - Identifying high-cost services
-   - Budget planning and monitoring
-
-2. **Open Source Alternatives**
-   - Finding cost-effective solutions
-   - Evaluating trade-offs between managed vs. self-hosted
-   - Implementation considerations
-
-3. **Optimization Strategies**
-   - Right-sizing resources
-   - Implementing auto-scaling
-   - Using appropriate storage classes
-
-4. **Architecture Decisions**
-   - Cost vs. performance trade-offs
-   - Risk assessment for changes
-   - Implementation planning
+1. **Cloud cost awareness** — Budget vs spend, service mix, provider-native knobs.
+2. **FinOps framing** — Effort, risk, KPI hints, chargeback / commitments.
+3. **Multi-cloud literacy** — Same narrative; different SKU language per provider.
+4. **Trade-offs** — Managed vs self-hosted, compliance vs cost (see industry playbooks).
 
 ## Technical Details
 
 ### Dependencies
-- **groq**: Groq Cloud API for LLM chat (Llama / Mixtral-class models)
-- **streamlit**, **plotly**: Dashboard (`streamlit_app.py`)
-- **python-dotenv**: Local `.env` loading (optional on Streamlit Cloud if you use Secrets)
-- **pandas**: Data manipulation
-- **rich**, **click**: Enhanced CLI (optional)
 
-### Model Used
-- Default **GROQ_MODEL** is `llama-3.3-70b-versatile` (override in `.env` or Streamlit Secrets)
-- **API**: [Groq](https://console.groq.com/) (API key required)
+- **groq** — LLM API  
+- **streamlit**, **plotly** — Dashboard  
+- **python-dotenv** — Local `.env`  
+- **pandas** — Tables and charts  
 
-### File Formats
-- **Input**: Plain text project description
-- **Intermediate**: JSON for structured data
-- **Output**: JSON reports with detailed recommendations
+### Model
+
+- Default **GROQ_MODEL**: `llama-3.3-70b-versatile` (override in `.env` or secrets).
 
 ## Important Notes
 
-1. **Synthetic Data**: This tool generates synthetic AWS billing data for educational purposes. Real AWS costs may vary.
-
-2. **Recommendations**: All recommendations are suggestions. Always evaluate them against your specific requirements and constraints.
-
-3. **Implementation**: Consider the implementation effort and risk level before applying recommendations.
-
-4. **Learning Focus**: This tool is designed for learning. Use it to understand cost optimization concepts and strategies.
+1. **Synthetic billing** — For education and demos; not a substitute for real billing exports.
+2. **Recommendations** — Suggestions only; validate against your architecture and compliance.
+3. **Profile changes** — If upgrading from an older repo, re-run **generate_profile** so `primary_cloud_provider` exists.
 
 ## Contributing
 
-This is an educational project for interns. Feel free to:
-- Add new optimization strategies
-- Improve the recommendation engine
-- Add support for more AWS services
-- Enhance the user interface
+Ideas: real billing ingestion (CUR / Azure / GCP), stronger validation of LLM JSON, tests, additional verticals or clouds.
 
 ## Additional Resources
 
-- [AWS Well-Architected Framework](https://aws.amazon.com/architecture/well-architected/)
-- [AWS Cost Optimization Best Practices](https://aws.amazon.com/pricing/cost-optimization/)
-- [Open Source Alternatives to AWS Services](https://github.com/open-guides/og-aws)
+- [AWS Well-Architected — Cost Optimization](https://docs.aws.amazon.com/wellarchitected/latest/cost-optimization-pillar/welcome.html)
+- [Azure Cost Management](https://learn.microsoft.com/en-us/azure/cost-management-billing/)
+- [Google Cloud FinOps hub](https://cloud.google.com/learn/finops)
 
 ## Troubleshooting
 
-### Common Issues
-
-1. **"Script not found" error**
-   - Ensure all Python files are in the same directory
-   - Check file permissions
-
-2. **"Error generating recommendations"** / **GROQ_API_KEY is missing**
-   - Check internet connection (calls Groq’s API)
-   - Local: set `GROQ_API_KEY` in `.env`
-   - Streamlit Cloud: **App settings → Secrets** with `GROQ_API_KEY`
-
-3. **"Could not load project data"**
-   - Run the complete analysis pipeline first
-   - Check that project_description.txt exists
-
-### Getting Help
-
-If you encounter issues:
-1. Check the error messages carefully
-2. Ensure all dependencies are installed
-3. Verify your project description is clear and complete
-4. Try running individual components to isolate issues
+1. **GROQ_API_KEY missing** — Set in `.env` or Streamlit **Secrets**.
+2. **Could not load project data** — Run the full pipeline; ensure `project_profile.json` and `mock_billing.json` exist.
+3. **Missing `primary_cloud_provider`** — Re-run `generate_profile.py` after pulling the latest code.
 
 ---
 
-**Happy Cost Optimizing! **
-
-*Remember: The goal is to learn cost optimization strategies, not just to reduce costs. Understanding the trade-offs and making informed decisions is the key to becoming a better cloud architect.*
-
-
-
-
+**Happy cost optimizing.** Use this to practice FinOps storytelling and provider-aware savings ideas—then validate with real usage and billing data.
